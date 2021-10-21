@@ -1,0 +1,73 @@
+include:
+
+  # browser-integration
+  - local: '/.gitlab/ci/browser-integration/capybara_chrome.yml'
+  - local: '/.gitlab/ci/browser-integration/capybara_ff.yml'
+  - local: '/.gitlab/ci/browser-integration/idoit_chrome.yml'
+  - local: '/.gitlab/ci/browser-integration/otrs_chrome.yml'
+
+.template_browser-integration_capybara: &template_browser-integration_capybara
+  stage: browser-integration
+  dependencies:
+    - browser:build
+  extends:
+    - .env_base
+    - .variables_app_restart_cmd
+    - .variables_es
+  variables:
+    RAILS_ENV: "test"
+  script:
+    - bundle exec rake zammad:ci:test:prepare
+    - bundle exec rspec --fail-fast --pattern "spec/system/**/*_spec.rb" -t integration --profile 10
+
+.template_browser-integration_capybara_chrome: &template_browser-integration_capybara_chrome
+  extends:
+    - .template_browser-integration_capybara
+    - .services_mysql_postgresql_elasticsearch_selenium_chrome_imap_redis_memcached
+
+.template_browser-integration_capybara_firefox: &template_browser-integration_capybara_firefox
+  extends:
+    - .template_browser-integration_capybara
+    - .services_mysql_postgresql_elasticsearch_selenium_firefox_imap_redis_memcached
+
+.template_browser-integration_chrome: &template_browser-integration_chrome
+  stage: browser-integration
+  dependencies:
+    - browser:build
+  extends:
+    - .env_base
+    - .variables_app_restart_cmd
+    - .services_postgresql_selenium_chrome
+  variables:
+    RAILS_ENV: "production"
+    AUTO_WIZARD_FILE: "contrib/auto_wizard_test.json"
+  script:
+    - RAILS_ENV=test bundle exec rake db:create
+    - cp $AUTO_WIZARD_FILE auto_wizard.json
+    - bundle exec rake zammad:ci:test:start
+    - bundle exec rails test $TEST_FILE
+
+.template_browser-integration_import_chrome: &template_browser-integration_import_chrome
+  stage: browser-integration
+  dependencies:
+    - browser:build
+  extends:
+    - .env_base
+    - .services_postgresql_selenium_chrome
+  variables:
+    RAILS_ENV: "production"
+    RAILS_SERVE_STATIC_FILES: "true"
+  script:
+    - RAILS_ENV=test bundle exec rake db:create
+    - bundle exec rake zammad:ci:test:start
+    - bundle exec rails test $TEST_FILE
+
+# we need at least one job to store and include this template
+# $IGNORE is not defined
+ignore:
+  stage: test
+  only:
+    variables:
+      - $IGNORE
+  script:
+    - ''
